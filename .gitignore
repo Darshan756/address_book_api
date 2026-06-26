@@ -8,4 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+.envapp.db
+address_book.db
+*.zip
+__pycache__/
+*.pyc
 .env
