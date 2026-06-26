@@ -24,6 +24,9 @@ class EntityType(Base):
         back_populates="entity_type"
     )
 
+    def __repr__(self) -> str:
+        return f"<EntityType(id={self.id}, name={self.name})>"
+
 
 class Address(Base):
     __tablename__ = "addresses"
