@@ -53,6 +53,9 @@ class AddressService:
         logger.debug("Service: fetching all entity types")
         return await self.repo.get_all_entity_types()
 
+    
+    
+    
     async def create_entity_type(self, data: EntityTypeCreate) -> EntityType:
         """
         Create a new user-defined entity type.
@@ -76,6 +79,11 @@ class AddressService:
 
         return await self.repo.create_entity_type(data.name)
 
+    
+    
+    
+    
+    
     async def delete_entity_type(self, entity_type_id: int) -> None:
         """
         Delete a user-defined entity type.
@@ -116,6 +124,12 @@ class AddressService:
         await self.repo.delete_entity_type(entity_type)
         logger.info(f"Service: entity type deleted id={entity_type_id}")
 
+    
+    
+    
+    
+    
+    
     # ─────────────────────────────────────────
     # ADDRESS BUSINESS LOGIC
     # ─────────────────────────────────────────
@@ -139,6 +153,10 @@ class AddressService:
 
         return address
 
+    
+    
+    
+    
     async def create_address(self, data: AddressCreate) -> Address:
         """
         Create a new address.
@@ -160,6 +178,10 @@ class AddressService:
         logger.info(f"Service: address created id={address.id}")
         return address
 
+    
+    
+    
+    
     async def update_address(
         self,
         address_id: int,
@@ -187,6 +209,9 @@ class AddressService:
         logger.info(f"Service: address updated id={address_id}")
         return updated
 
+   
+   
+   
     async def delete_address(self, address_id: int) -> None:
         """
         Delete an address.
@@ -201,6 +226,9 @@ class AddressService:
         await self.repo.delete_address(address)
         logger.info(f"Service: address deleted id={address_id}")
 
+    
+    
+    
     # ─────────────────────────────────────────
     # UNIFIED SEARCH — core assessment feature
     # ─────────────────────────────────────────
@@ -247,7 +275,6 @@ class AddressService:
                 params.entity_type
             )
             if not resolved_entity_type:
-                # no entity type matched — return empty response immediately
                 logger.info(
                     f"Service: no entity type matched '{params.entity_type}'"
                 )
@@ -306,6 +333,7 @@ class AddressService:
             results=paginated,
         )
 
+  
     # ─────────────────────────────────────────
     # PRIVATE HELPERS
     # ─────────────────────────────────────────

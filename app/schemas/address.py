@@ -6,11 +6,13 @@ from typing import Optional,Generic, TypeVar
 class EntityTypeBase(BaseModel):
     """Shared fields used by both create and response schemas."""
     name: str = Field(
-        ...,                        # ... means required, no default
+        ...,                       
         min_length=1,
         max_length=100,
         description="Type of the address e.g. home, work, business"
     )
+
+
 
 class EntityTypeCreate(EntityTypeBase):
     """
@@ -19,6 +21,8 @@ class EntityTypeCreate(EntityTypeBase):
     False for user-created types, set in the service layer.
     """
     pass
+
+
 
 
 class EntityTypeOut(EntityTypeBase):
@@ -33,6 +37,8 @@ class EntityTypeOut(EntityTypeBase):
     model_config = {"from_attributes": True} 
 
 # ADDRESS SCHEMAS
+
+
 
 class AddressBase(BaseModel):
     """
@@ -90,6 +96,9 @@ class AddressBase(BaseModel):
             raise ValueError("City cannot be blank")
         return v.strip()
     
+
+
+
 class AddressCreate(AddressBase):
     """
     Schema for creating a new address.
@@ -97,6 +106,9 @@ class AddressCreate(AddressBase):
     All required fields must be provided by the user.
     """
     pass
+
+
+
 
 
 
@@ -117,6 +129,10 @@ class AddressUpdate(BaseModel):
     latitude: Optional[float] = Field(None, ge=-90, le=90)
     longitude: Optional[float] = Field(None, ge=-180, le=180)
 
+
+
+
+
 class AddressOut(AddressBase):
     """
     Schema for returning address data in API responses.
@@ -129,6 +145,9 @@ class AddressOut(AddressBase):
     model_config = {"from_attributes": True}
 
 # DISTANCE SEARCH SCHEMA
+
+
+
 
 class NearbySearchParams(BaseModel):
     """
@@ -152,9 +171,10 @@ class NearbySearchParams(BaseModel):
         description="Filter by entity type name e.g. restaurant, home, work"
     )
 
+
+
+
 T = TypeVar("T")
-
-
 class PaginatedResponse(BaseModel, Generic[T]):
     """
     Generic paginated response wrapper.
@@ -174,6 +194,9 @@ class PaginatedResponse(BaseModel, Generic[T]):
     page_size: int              # results per page
     pages: int                  # total number of pages
     results: list[T]            # actual data
+
+
+
 
 
 class AddressFilterParams(BaseModel):

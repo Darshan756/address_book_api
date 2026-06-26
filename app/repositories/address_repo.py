@@ -34,10 +34,13 @@ class AddressRepository:
         """
         self.db = db
 
+    
     # ─────────────────────────────────────────
     # ENTITY TYPE QUERIES
     # ─────────────────────────────────────────
 
+    
+    
     async def get_all_entity_types(self) -> list[EntityType]:
         """Fetch all entity types ordered by name."""
         logger.debug("Repo: fetching all entity types")
@@ -46,6 +49,8 @@ class AddressRepository:
         )
         return list(result.scalars().all())
 
+    
+    
     async def get_entity_type_by_id(self, entity_type_id: int) -> EntityType | None:
         """
         Fetch a single entity type by its ID.
@@ -58,6 +63,9 @@ class AddressRepository:
         )
         return result.scalar_one_or_none()
 
+    
+    
+    
     async def get_entity_type_by_name(self, name: str) -> EntityType | None:
         """
         Fetch a single entity type by name.
@@ -69,6 +77,9 @@ class AddressRepository:
         )
         return result.scalar_one_or_none()
 
+    
+    
+    
     async def create_entity_type(self, name: str) -> EntityType:
         """
         Create a new user-defined entity type.
@@ -86,6 +97,10 @@ class AddressRepository:
         logger.info(f"Repo: entity type created id={entity_type.id}")
         return entity_type
 
+    
+    
+    
+    
     async def delete_entity_type(self, entity_type: EntityType) -> None:
         """
         Delete an entity type.
@@ -99,10 +114,18 @@ class AddressRepository:
         await self.db.delete(entity_type)
         await self.db.flush()
 
+    
+    
+    
     # ─────────────────────────────────────────
     # ADDRESS QUERIES
     # ─────────────────────────────────────────
 
+    
+    
+    
+    
+    
     async def get_address_by_id(self, address_id: int) -> Address | None:
         """
         Fetch a single address by ID with entity_type eagerly loaded.
@@ -119,6 +142,10 @@ class AddressRepository:
         )
         return result.scalar_one_or_none()
 
+    
+    
+    
+    
     async def create_address(self, data: AddressCreate) -> Address:
         """
         Insert a new address row.
@@ -139,6 +166,11 @@ class AddressRepository:
         logger.info(f"Repo: address created id={address.id}")
         return address
 
+    
+    
+    
+    
+    
     async def update_address(self, address: Address, data: AddressUpdate) -> Address:
         """
         Update only the fields provided in data (PATCH behaviour).
@@ -159,16 +191,26 @@ class AddressRepository:
         )
         return address
 
+    
+    
+    
+    
     async def delete_address(self, address: Address) -> None:
         """Delete an address row."""
         logger.info(f"Repo: deleting address id={address.id}")
         await self.db.delete(address)
         await self.db.flush()
 
+    
+    
+    
     # ─────────────────────────────────────────
     # SEARCH QUERIES
     # ─────────────────────────────────────────
 
+    
+    
+    
     async def get_filtered_addresses(
         self,
         name: Optional[str] = None,
