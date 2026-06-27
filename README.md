@@ -98,7 +98,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/address-book-api.git
+git clone https://github.com/Darshan756/address_book_api.git
 cd address-book-api
 ```
 
@@ -119,14 +119,8 @@ source .venv/bin/activate
 
 **Windows (Command Prompt):**
 ```bash
-.venv\Scripts\activate.bat
+.venv\Scripts\activate
 ```
-
-**Windows (PowerShell):**
-```bash
-.venv\Scripts\Activate.ps1
-```
-
 You should see `(.venv)` in your terminal prompt confirming activation.
 
 > **Note:** If you use `uv run` prefix before every command (as shown in this README),
