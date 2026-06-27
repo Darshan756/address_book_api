@@ -182,19 +182,7 @@ uv run uvicorn app.main:app --reload
 uv run uvicorn app.main:app --reload --port 8080
 ```
 
-### Production
 
-```bash
-uv run gunicorn app.main:app \
-  -k uvicorn.workers.UvicornWorker \
-  --workers 4 \
-  --bind 0.0.0.0:8000
-```
-
-> For production, set `DEBUG=False` in your `.env`
-> and restrict `CORS` origins in `main.py`.
-
----
 
 ## API Documentation
 
