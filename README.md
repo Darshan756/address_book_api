@@ -98,7 +98,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/address-book-api.git
+git clone https://github.com/Darshan756/address_book_api.git
 cd address-book-api
 ```
 
