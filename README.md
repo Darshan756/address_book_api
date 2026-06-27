@@ -98,7 +98,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Darshan756/address_book_api.git
+git clone https://github.com/your-username/address-book-api.git
 cd address-book-api
 ```
 
@@ -110,7 +110,30 @@ uv sync
 
 This creates a virtual environment and installs all dependencies from `pyproject.toml`.
 
-### 3. Configure environment variables
+### 3. Activate the virtual environment
+
+**macOS / Linux:**
+```bash
+source .venv/bin/activate
+```
+
+**Windows (Command Prompt):**
+```bash
+.venv\Scripts\activate.bat
+```
+
+**Windows (PowerShell):**
+```bash
+.venv\Scripts\Activate.ps1
+```
+
+You should see `(.venv)` in your terminal prompt confirming activation.
+
+> **Note:** If you use `uv run` prefix before every command (as shown in this README),
+> you don't need to activate the virtual environment manually —
+> `uv run` handles it automatically.
+
+### 4. Configure environment variables
 
 ```bash
 cp .env.example .env
