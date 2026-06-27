@@ -8,8 +8,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm import DeclarativeBase
 
 
+
+
 class Base(DeclarativeBase):
     pass
+
+
+
 
 
 class EntityType(Base):
@@ -26,6 +31,8 @@ class EntityType(Base):
 
     def __repr__(self) -> str:
         return f"<EntityType(id={self.id}, name={self.name})>"
+
+
 
 
 class Address(Base):

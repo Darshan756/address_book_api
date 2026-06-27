@@ -21,13 +21,12 @@ from app.services.address_service import AddressService
 
 logger = logging.getLogger(__name__)
 
-# prefix and tags apply to all routes in this file
-# prefix   → all routes start with /entity-types
-# tags     → groups routes under "Entity Types" in Swagger docs
 router = APIRouter(
     prefix="/entity-types",
     tags=["Entity Types"],
 )
+
+
 
 
 @router.get(
@@ -35,8 +34,30 @@ router = APIRouter(
     response_model=list[EntityTypeOut],
     summary="List all entity types",
     description=(
-        "Returns all entity types including system defaults "
-        "(home, work, business, other) and user-created ones."
+        "Returns all available entity types — both system defaults and "
+        "any custom ones you have created.\n\n"
+
+        "---\n\n"
+
+        "### Default entity types\n"
+        "These are seeded automatically when the app starts "
+        "and **cannot be deleted**:\n\n"
+        "| ID | Name | is_default |\n"
+        "|----|------|------------|\n"
+        "| 1 | home | true |\n"
+        "| 2 | work | true |\n"
+        "| 3 | business | true |\n"
+        "| 4 | other | true |\n\n"
+
+        "---\n\n"
+
+        "### Custom entity types\n"
+        "Any types you create via `POST /entity-types` will appear here "
+        "with `is_default: false`. "
+        "These can be deleted using `DELETE /entity-types/{id}`.\n\n"
+
+        "Use the `id` from this list when creating an address — "
+        "pass it as `entity_type_id` in `POST /addresses`."
     ),
 )
 async def list_entity_types(
@@ -44,22 +65,48 @@ async def list_entity_types(
 ) -> list[EntityType]:
     """
     Fetch all entity types.
-    is_default=True  → seeded via migration, cannot be deleted.
+    is_default=True  → seeded at startup, cannot be deleted.
     is_default=False → created by user via API, can be deleted.
     """
     logger.info("Route: GET /entity-types")
     return await service.get_all_entity_types()
 
 
+
+
+
 @router.post(
     "/",
     response_model=EntityTypeOut,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new entity type",
+    summary="Create a custom entity type",
     description=(
-        "Create a custom entity type. "
-        "Name must be unique (case insensitive). "
-        "Names are stored lowercase automatically."
+        "Create a new custom entity type to categorise your addresses.\n\n"
+
+        "---\n\n"
+
+        "### How it works\n"
+        "- Provide a `name` for the new type (e.g. `restaurant`, `gym`, `hotel`).\n"
+        "- Names are stored **lowercase** automatically — `Restaurant` becomes `restaurant`.\n"
+        "- Names must be **unique** — creating a duplicate returns `409 Conflict`.\n"
+        "- The new type will have `is_default: false` — meaning it can be deleted later.\n\n"
+
+        "---\n\n"
+
+        "### Using the new type\n"
+        "Once created, copy the `id` from the response and use it as "
+        "`entity_type_id` when creating an address in `POST /addresses`.\n\n"
+
+        "---\n\n"
+
+        "### Default types (already available)\n"
+        "You don't need to create these — they exist by default:\n"
+        "`home`, `work`, `business`, `other`\n\n"
+
+        "---\n\n"
+
+        "### Error responses\n"
+        "- `409 Conflict` — an entity type with this name already exists."
     ),
 )
 async def create_entity_type(
@@ -74,14 +121,29 @@ async def create_entity_type(
     return await service.create_entity_type(data)
 
 
+
+
+
 @router.delete(
     "/{entity_type_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete an entity type",
+    summary="Delete a custom entity type",
     description=(
-        "Delete a user-created entity type. "
-        "Default types (home, work, business, other) "
-        "are protected and cannot be deleted."
+        "Delete a user-created entity type by its ID.\n\n"
+
+        "---\n\n"
+
+        "### Rules\n"
+        "- **Default types cannot be deleted** — `home`, `work`, `business`, `other` "
+        "are protected. Attempting to delete them returns `403 Forbidden`.\n"
+        "- Only custom types (`is_default: false`) created via "
+        "`POST /entity-types` can be deleted.\n\n"
+
+        "---\n\n"
+
+        "### Error responses\n"
+        "- `404 Not Found` — entity type with this ID does not exist.\n"
+        "- `403 Forbidden` — attempting to delete a protected default type."
     ),
 )
 async def delete_entity_type(

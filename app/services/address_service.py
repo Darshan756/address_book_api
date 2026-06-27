@@ -22,12 +22,13 @@ from app.schemas.address import (
     AddressOut,
     AddressUpdate,
     EntityTypeCreate,
+    NearbySearchParams,
     PaginatedResponse,
 )
 
-# module-level logger
-# logs appear as "app.services.address_service" in output
 logger = logging.getLogger(__name__)
+
+
 
 
 class AddressService:
@@ -48,6 +49,8 @@ class AddressService:
     # ENTITY TYPE BUSINESS LOGIC
     # ─────────────────────────────────────────
 
+    
+    
     async def get_all_entity_types(self) -> list[EntityType]:
         """Return all entity types. No rules needed here."""
         logger.debug("Service: fetching all entity types")
@@ -80,9 +83,7 @@ class AddressService:
         return await self.repo.create_entity_type(data.name)
 
     
-    
-    
-    
+    \
     
     async def delete_entity_type(self, entity_type_id: int) -> None:
         """
@@ -124,16 +125,21 @@ class AddressService:
         await self.repo.delete_entity_type(entity_type)
         logger.info(f"Service: entity type deleted id={entity_type_id}")
 
-    
-    
-    
-    
-    
-    
     # ─────────────────────────────────────────
     # ADDRESS BUSINESS LOGIC
     # ─────────────────────────────────────────
 
+    
+    
+    async def get_all_addresses(self) -> list[Address]:
+        """Return all addresses. No rules needed here."""
+        logger.debug("Service: fetching all addresses")
+        return await self.repo.get_all_addresses()
+
+    
+    
+    
+    
     async def get_address_by_id(self, address_id: int) -> Address:
         """
         Fetch a single address by ID.
@@ -153,7 +159,6 @@ class AddressService:
 
         return address
 
-    
     
     
     
@@ -178,8 +183,6 @@ class AddressService:
         logger.info(f"Service: address created id={address.id}")
         return address
 
-    
-    
     
     
     async def update_address(
@@ -209,9 +212,9 @@ class AddressService:
         logger.info(f"Service: address updated id={address_id}")
         return updated
 
-   
-   
-   
+    
+    
+    
     async def delete_address(self, address_id: int) -> None:
         """
         Delete an address.
@@ -233,52 +236,70 @@ class AddressService:
     # UNIFIED SEARCH — core assessment feature
     # ─────────────────────────────────────────
 
+    
+    
+    
+    
     async def search_addresses(
         self,
         params: AddressFilterParams,
     ) -> PaginatedResponse[AddressOut]:
         """
-        Unified search — handles all combinations of:
-            - name filter     (partial SQL match)
-            - entity type     (fuzzy resolved → exact SQL match)
-            - distance filter (haversine in Python)
-            - pagination      (slice final results)
+        Unified search with distance filtering, name/type filters,
+        and pagination.
 
-        Filter order (cheapest to most expensive):
-            1. Resolve fuzzy entity type → exact name
-            2. SQL filters: name + entity type  → reduces dataset early
-            3. Python distance filter           → haversine on reduced set
-            4. Pagination                       → slice final results
+        How filters work:
+        ─────────────────
+        entity_name  → partial SQL match (case insensitive)
+                       "john" matches "John Doe", "John Smith"
 
-        Examples:
-            ?name=john                              → all Johns
-            ?entity_type=resto                      → all restaurants
-            ?entity_type=restaurant&radius=10       → restaurants within 10km
-            ?name=mcdonalds&entity_type=restaurant  → combined
-            ?page=2&page_size=5                     → paginated
+        entity_type  → fuzzy resolved to exact name, then SQL match
+                       "resto" → resolves to "restaurant" → SQL filter
+                       "restrunt" → typo tolerance via difflib
+
+        distance     → always applied using haversine formula
+                       latitude + longitude are required
+                       radius defaults to 5.0 if not provided
+
+        Filter order (cheapest first):
+            1. Resolve fuzzy entity_type → exact name   (in-memory)
+            2. SQL filters: entity_name + entity_type   (DB level)
+            3. Distance filter: haversine               (Python)
+            4. Paginate                                 (Python slice)
+            5. Convert ORM → Pydantic                   (model_validate)
+
+        Why convert ORM → Pydantic explicitly?
+        ────────────────────────────────────────
+        PaginatedResponse is a Generic Pydantic model. Pydantic cannot
+        build a schema for SQLAlchemy ORM objects inside a Generic wrapper.
+        We convert each Address → AddressOut using model_validate() which
+        reads ORM attributes via from_attributes=True in AddressOut.model_config.
         """
         logger.info(
-            f"Service: search addresses "
-            f"name={params.name} entity_type={params.entity_type} "
+            f"Service: search_addresses "
             f"lat={params.latitude} lon={params.longitude} "
-            f"radius={params.radius} "
+            f"radius={params.radius} {settings.DEFAULT_DISTANCE_UNIT} "
+            f"entity_name={params.entity_name} "
+            f"entity_type={params.entity_type} "
             f"page={params.page} page_size={params.page_size}"
         )
 
-        # step 1: resolve fuzzy entity type search to exact stored name
+        # step 1: resolve fuzzy entity_type to exact stored name
         # "resto"    → "restaurant"
-        # "restrunt" → "restaurant" (typo tolerance)
-        # "home"     → "home"
+        # "restrunt" → "restaurant" (typo tolerance via difflib)
+        # None       → no entity type filter applied
         resolved_entity_type = None
         if params.entity_type:
             resolved_entity_type = await self._resolve_entity_type(
                 params.entity_type
             )
             if not resolved_entity_type:
+                # no entity type matched — return empty response immediately
+                # avoids unnecessary DB query
                 logger.info(
                     f"Service: no entity type matched '{params.entity_type}'"
                 )
-                return PaginatedResponse(
+                return PaginatedResponse[AddressOut](
                     total=0,
                     page=params.page,
                     page_size=params.page_size,
@@ -286,32 +307,34 @@ class AddressService:
                     results=[],
                 )
 
-        # step 2: fetch from DB with SQL-level name + type filters
-        # reduces the dataset before the expensive Python distance check
+        # step 2: fetch from DB applying SQL-level filters
+        # entity_name → partial ILIKE match in SQL
+        # entity_type → exact match after fuzzy resolution above
+        # reduces the dataset before the Python distance calculation
         addresses = await self.repo.get_filtered_addresses(
-            name=params.name,
+            entity_name=params.entity_name,
             entity_type_name=resolved_entity_type,
         )
         logger.debug(
             f"Service: {len(addresses)} addresses after SQL filters"
         )
 
-        # step 3: apply distance filter in Python using haversine
-        # only activates when all three coords are provided together
-        
+        # step 3: apply distance filter using haversine formula
+        # always runs — latitude and longitude are always required
+        # radius defaults to 5.0 km if user does not provide one
         addresses = [
-                address for address in addresses
-                if self._haversine(
-                    origin_lat=params.latitude,
-                    origin_lon=params.longitude,
-                    target_lat=address.latitude,
-                    target_lon=address.longitude,
-                ) <= params.radius
-            ]
+            address for address in addresses
+            if self._haversine(
+                origin_lat=params.latitude,
+                origin_lon=params.longitude,
+                target_lat=address.latitude,
+                target_lon=address.longitude,
+            ) <= params.radius
+        ]
         logger.debug(
-                f"Service: {len(addresses)} addresses after distance filter "
-                f"({params.radius} {settings.DEFAULT_DISTANCE_UNIT})"
-            )
+            f"Service: {len(addresses)} addresses after distance filter "
+            f"({params.radius} {settings.DEFAULT_DISTANCE_UNIT})"
+        )
 
         # step 4: paginate the final filtered list
         total = len(addresses)
@@ -320,24 +343,94 @@ class AddressService:
         end = start + params.page_size
         paginated = addresses[start:end]
 
+        # step 5: convert ORM Address objects → Pydantic AddressOut
+        # required because PaginatedResponse is Generic and Pydantic
+        # cannot serialize SQLAlchemy ORM objects directly inside it
+        paginated_out = [
+            AddressOut.model_validate(address) for address in paginated
+        ]
+
         logger.info(
             f"Service: returning page {params.page}/{pages} "
-            f"({len(paginated)} of {total} results)"
+            f"({len(paginated_out)} of {total} results)"
         )
 
-        return PaginatedResponse(
+        return PaginatedResponse[AddressOut](
             total=total,
             page=params.page,
             page_size=params.page_size,
             pages=pages,
-            results=paginated,
+            results=paginated_out,
         )
 
-  
+    
+    
+    
+    async def get_nearby_addresses(
+        self,
+        params: NearbySearchParams,
+    ) -> list[Address]:
+        """
+        Simple nearby search used by the legacy /search endpoint.
+        Filters by distance and optionally by entity type.
+
+        Why Haversine and not Euclidean (straight line) distance?
+        ───────────────────────────────────────────────────────────
+        Earth is a sphere. Treating lat/lon as flat X/Y coordinates
+        introduces significant error especially at larger distances
+        or near the poles. Haversine accounts for Earth's curvature
+        and returns accurate real-world distances.
+
+        Why filter in Python and not SQL?
+        ────────────────────────────────
+        SQLite has no native geospatial extension. In a production
+        setup with PostgreSQL + PostGIS you would do this filtering
+        directly in SQL with ST_DWithin() for better performance.
+        """
+        logger.info(
+            f"Service: get_nearby_addresses "
+            f"lat={params.latitude} lon={params.longitude} "
+            f"radius={params.radius} entity_type={params.entity_type}"
+        )
+
+        all_addresses = await self.repo.get_all_addresses_with_coordinates()
+
+        nearby = []
+        for address in all_addresses:
+            # filter 1: distance check
+            distance = self._haversine(
+                origin_lat=params.latitude,
+                origin_lon=params.longitude,
+                target_lat=address.latitude,
+                target_lon=address.longitude,
+            )
+            if distance > params.radius:
+                continue
+
+            # filter 2: fuzzy entity type match if provided
+            if params.entity_type:
+                if not self._is_similar(
+                    params.entity_type, address.entity_type.name
+                ):
+                    continue
+
+            nearby.append(address)
+
+        logger.info(
+            f"Service: found {len(nearby)} addresses within "
+            f"{params.radius} {settings.DEFAULT_DISTANCE_UNIT}"
+        )
+        return nearby
+
+    
+    
+    
     # ─────────────────────────────────────────
     # PRIVATE HELPERS
     # ─────────────────────────────────────────
 
+    
+    
     async def _validate_entity_type(self, entity_type_id: int) -> None:
         """
         Reusable guard — raises HTTP 404 if entity type does not exist.
@@ -351,6 +444,7 @@ class AddressService:
                 detail=f"Entity type with id {entity_type_id} not found",
             )
 
+    
     async def _resolve_entity_type(self, search: str) -> Optional[str]:
         """
         Resolve a fuzzy entity type search term to an exact stored name.
@@ -404,6 +498,42 @@ class AddressService:
         )
         return None
 
+    
+    
+    
+    def _is_similar(
+        self,
+        search: str,
+        target: str,
+        threshold: float = 0.6,
+    ) -> bool:
+        """
+        Fuzzy match between search term and entity type name.
+
+        threshold=0.6 means 60% similarity required.
+        Examples:
+            "restaurant" vs "restaurant" → 1.0  ✅ match
+            "restaurants" vs "restaurant" → 0.96 ✅ match
+            "resto"      vs "restaurant" → 0.71 ✅ match
+            "restrunt"   vs "restaurant" → 0.78 ✅ match
+            "home"       vs "restaurant" → 0.31 ❌ no match
+        """
+        ratio = SequenceMatcher(
+            None,
+            search.lower(),
+            target.lower(),
+        ).ratio()
+
+        logger.debug(
+            f"Fuzzy match: '{search}' vs '{target}' "
+            f"ratio={ratio:.2f} threshold={threshold}"
+        )
+        return ratio >= threshold
+
+    
+    
+    
+    
     def _haversine(
         self,
         origin_lat: float,
@@ -442,7 +572,7 @@ class AddressService:
         """
         # select earth radius based on configured distance unit
         earth_radius = (
-            3956.0  # miles
+            3956.0      # miles
             if settings.DEFAULT_DISTANCE_UNIT == "miles"
             else 6371.0  # kilometres (default)
         )

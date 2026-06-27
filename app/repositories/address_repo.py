@@ -19,6 +19,9 @@ from app.schemas.address import AddressCreate, AddressUpdate
 logger = logging.getLogger(__name__)
 
 
+
+
+
 class AddressRepository:
     """
     Handles all database operations for Address and EntityType.
@@ -35,12 +38,11 @@ class AddressRepository:
         self.db = db
 
     
+    
     # ─────────────────────────────────────────
     # ENTITY TYPE QUERIES
     # ─────────────────────────────────────────
 
-    
-    
     async def get_all_entity_types(self) -> list[EntityType]:
         """Fetch all entity types ordered by name."""
         logger.debug("Repo: fetching all entity types")
@@ -49,6 +51,7 @@ class AddressRepository:
         )
         return list(result.scalars().all())
 
+    
     
     
     async def get_entity_type_by_id(self, entity_type_id: int) -> EntityType | None:
@@ -77,9 +80,10 @@ class AddressRepository:
         )
         return result.scalar_one_or_none()
 
-    
-    
-    
+   
+   
+   
+   
     async def create_entity_type(self, name: str) -> EntityType:
         """
         Create a new user-defined entity type.
@@ -100,7 +104,6 @@ class AddressRepository:
     
     
     
-    
     async def delete_entity_type(self, entity_type: EntityType) -> None:
         """
         Delete an entity type.
@@ -114,14 +117,30 @@ class AddressRepository:
         await self.db.delete(entity_type)
         await self.db.flush()
 
-    
-    
-    
+   
+   
+   
     # ─────────────────────────────────────────
     # ADDRESS QUERIES
     # ─────────────────────────────────────────
 
     
+    
+    
+    async def get_all_addresses(self) -> list[Address]:
+        """
+        Fetch all addresses with their entity_type eagerly loaded.
+        selectinload avoids the N+1 query problem — instead of
+        one query per address to fetch entity_type, it does 2 queries total.
+        """
+        logger.debug("Repo: fetching all addresses")
+        result = await self.db.execute(
+            select(Address).options(
+                selectinload(Address.entity_type)
+            )
+        )
+        return list(result.scalars().all())
+
     
     
     
@@ -130,9 +149,6 @@ class AddressRepository:
         """
         Fetch a single address by ID with entity_type eagerly loaded.
         Returns None if not found.
-
-        selectinload — avoids N+1 query problem. Loads entity_type
-        in a second query upfront instead of one query per address.
         """
         logger.debug(f"Repo: fetching address id={address_id}")
         result = await self.db.execute(
@@ -170,7 +186,6 @@ class AddressRepository:
     
     
     
-    
     async def update_address(self, address: Address, data: AddressUpdate) -> Address:
         """
         Update only the fields provided in data (PATCH behaviour).
@@ -204,52 +219,73 @@ class AddressRepository:
     
     
     
+    async def get_all_addresses_with_coordinates(self) -> list[Address]:
+        """
+        Fetch all addresses that have valid coordinates.
+        Used by the simple nearby search — distance filtered
+        in Python using haversine because SQLite has no
+        native geospatial functions.
+        """
+        logger.debug("Repo: fetching all addresses with coordinates")
+        result = await self.db.execute(
+            select(Address)
+            .options(selectinload(Address.entity_type))
+            .where(
+                Address.latitude.is_not(None),
+                Address.longitude.is_not(None),
+            )
+        )
+        return list(result.scalars().all())
+
     # ─────────────────────────────────────────
-    # SEARCH QUERIES
+    # FILTERED SEARCH QUERY
     # ─────────────────────────────────────────
 
-    
     
     
     async def get_filtered_addresses(
         self,
-        name: Optional[str] = None,
+        entity_name: Optional[str] = None,
         entity_type_name: Optional[str] = None,
     ) -> list[Address]:
         """
-        Fetch addresses filtered at SQL level by name and/or entity type.
+        Fetch addresses filtered at SQL level by entity name
+        and/or entity type name.
 
         Why filter name and type in SQL but distance in Python?
         ─────────────────────────────────────────────────────────
         Name and type are simple string comparisons — SQL handles
-        these efficiently with LIKE and JOIN.
+        these efficiently with ILIKE and JOIN.
         Distance requires haversine math — SQLite has no geospatial
         functions so we filter coordinates in Python after fetching.
 
         Args:
-            name:             partial case insensitive name match
+            entity_name:      partial case insensitive match on entity_name
+                              e.g. "john" matches "John Doe", "John Smith"
             entity_type_name: exact entity type name to filter by
-                              (fuzzy matching happens in service layer)
+                              (fuzzy resolution already done in service layer)
         """
         logger.debug(
-            f"Repo: filtered addresses "
-            f"name={name} entity_type={entity_type_name}"
+            f"Repo: get_filtered_addresses "
+            f"entity_name={entity_name} entity_type={entity_type_name}"
         )
 
         query = (
             select(Address)
             .options(selectinload(Address.entity_type))
-            .join(Address.entity_type)  # join entity_types table
+            .join(Address.entity_type)  # join entity_types table for type filter
         )
 
-        # filter by entity name (partial, case insensitive)
-        if name:
+        # filter by entity name — partial case insensitive match
+        # "john" matches "John Doe", "John Smith", "Johnson Corp"
+        if entity_name:
             query = query.where(
-                Address.entity_name.ilike(f"%{name}%")
+                Address.entity_name.ilike(f"%{entity_name}%")
             )
 
-        # filter by entity type name (exact match —
-        # fuzzy resolution already done in service layer)
+        # filter by entity type name — exact match
+        # fuzzy resolution already done in service layer
+        # so by the time we get here it's already "restaurant" not "resto"
         if entity_type_name:
             query = query.where(
                 EntityType.name == entity_type_name.lower()
