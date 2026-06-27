@@ -58,10 +58,10 @@ async def test_create_address():
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
-        follow_redirects=True,      # ← fix: follows the 307 redirect
+        follow_redirects=True,      
     ) as client:
         response = await client.post(
-            "/api/v1/addresses/",   # ← fix: trailing slash
+            "/api/v1/addresses/",  
             json={
                 "entity_name": "John Doe",
                 "entity_type_id": 1,
@@ -90,11 +90,11 @@ async def test_get_address_by_id():
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
-        follow_redirects=True,      # ← fix: follows the 307 redirect
+        follow_redirects=True,      
     ) as client:
         # create first
         create_response = await client.post(
-            "/api/v1/addresses/",   # ← fix: trailing slash
+            "/api/v1/addresses/",  
             json={
                 "entity_name": "Jane Doe",
                 "entity_type_id": 1,
